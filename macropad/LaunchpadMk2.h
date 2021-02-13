@@ -16,11 +16,6 @@ namespace midi_device::launchpadmk2
 
 	namespace config
 	{
-		class ConfigFile
-		{
-			
-		};
-
 		class ButtonBase
 		{
 			unsigned int color;
@@ -32,6 +27,15 @@ namespace midi_device::launchpadmk2
 			virtual std::wstring to_wstring() = 0;
 			void set_color(unsigned int col) { color = col; }
 			unsigned int get_color() { return color; }
+		};
+
+		class ButtonSimpleKeycodeTest : public ButtonBase {
+			int keycode;
+		public:
+			ButtonSimpleKeycodeTest() : keycode(-1) {}
+			ButtonSimpleKeycodeTest(int keycode) : keycode(keycode) {}
+			void execute();
+			std::wstring to_wstring();
 		};
 
 		typedef std::function<void()> ComplexMacroFn;
@@ -83,9 +87,11 @@ namespace midi_device::launchpadmk2
 		void Init();
 		void sendMessage(unsigned char* message);
 		void fullLedUpdate();
-		void setup_pages();
+		void setup_pages_test();
 
 		void reset();
+
+		void load_config_buttons_test();
 
 		launchpad_grid* getCurrentButtons()
 		{
@@ -98,11 +104,36 @@ namespace midi_device::launchpadmk2
 		static void RunDevice();
 		static void TerminateDevice();
 
-		static LaunchpadMk2* GetDevice() { return main_device; }
+		static LaunchpadMk2* GetDevice()
+		{
+			return reinterpret_cast<LaunchpadMk2*>(midi_device::devices.at(0));
+		}
+	};
+
+	enum class message_type
+	{
+		invalid = 0x0,
+		grid_depressed = 0x90,
+		grid_pressed = 0x90 + 0x7F,
+		grid_page_change_depressed = 0x90 + 0x7F + 0x1,
+		grid_page_change_pressed = 0x90 + 0x7F + 0x2,
+		automap_live_depressed = 0xB0,
+		automap_live_pressed = 0xB0 + 0x7F,
+	};
+
+	class input
+	{
+	public:
+		std::vector<unsigned char> message;
+
+		input(std::vector<unsigned char> msg) : message(msg) {};
+		message_type message_type();
+		unsigned char keycode();
 	};
 
 	namespace commands
 	{
+		// pre-calculated values.
 		constexpr unsigned char vel_off = 0x00;
 
 		// we're going bottom to top unlike top to bottom..
@@ -129,15 +160,15 @@ namespace midi_device::launchpadmk2
 			return new unsigned char[5]
 			{
 				0x90, key,
-				(unsigned char) (color & 0xFF0000) >> 4,
-				(unsigned char) (color & 0x00FF00) >> 2,
-				(unsigned char) (color & 0x0000FF),
+				static_cast<unsigned char>((color & 0xFF0000) >> 4),
+				static_cast<unsigned char>((color & 0x00FF00) >> 2),
+				static_cast<unsigned char>(color & 0x0000FF),
 			};
 		}
 
 		inline unsigned char* led_off(unsigned char key)
 		{
-			return new unsigned char[3]{ 0x80, key };
+			return led_setPalette(key, 0);
 		}
 
 		constexpr unsigned char reset[3] = { 0xB0, 0x00, 0x00 };

@@ -135,7 +135,7 @@ namespace macropad {
                 break;
             }
             case IDC_MIDI_DEVICE_START: {
-                new midi_device::launchpad::Launchpad
+                new midi_device::launchpad::Launchpad;
                 break;
             }
             case IDC_MIDI_DEVICE_REFRESH: {

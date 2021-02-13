@@ -12,6 +12,7 @@ bool midi_device::launchpadmk2::execute_all = true;
 void midi_device::launchpadmk2::LaunchpadMk2::Init()
 {
 	unsigned int nPorts = in->getPortCount();
+    _DebugString("There are " + std::to_string(nPorts) + " MIDI input sources available.\n");
     std::string portName;
     for (unsigned int i = 0; i < nPorts; i++) {
         try {
@@ -60,7 +61,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::Init()
         }
     }
 
-    this->setup_pages();
+    this->setup_pages_test();
     this->fullLedUpdate();
 }
 
@@ -75,6 +76,31 @@ void midi_device::launchpadmk2::LaunchpadMk2::RunDevice()
     main_device = new LaunchpadMk2();
     main_device->Init();
     main_device->Loop();
+}
+
+midi_device::launchpadmk2::message_type midi_device::launchpadmk2::input::message_type() {
+    midi_device::launchpadmk2::message_type type =
+        static_cast<midi_device::launchpadmk2::message_type>(message.at(0) + message.at(2));
+
+    // this shouldn't happen...
+    if (type > message_type::automap_live_pressed || type < message_type::grid_depressed) {
+        return message_type::invalid;
+    }
+
+    if (message.at(1) % 0x10 == 0x08) {
+        if (type == message_type::grid_depressed) {
+            return message_type::grid_page_change_depressed;
+        }
+        else if (type == message_type::grid_pressed) {
+            return message_type::grid_page_change_pressed;
+        }
+    }
+
+    return static_cast<midi_device::launchpadmk2::message_type>(message.at(0) + message.at(2));
+}
+
+unsigned char midi_device::launchpadmk2::input::keycode() {
+    return message.at(1);
 }
 
 /// Input loop
@@ -100,62 +126,47 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
         if (nBytes > 0)
             _DebugString("stamp = " + std::to_string(stamp) + "\n");
 
-		if (nBytes == 3)
+        if (nBytes != 3)
+            continue;
+
+        input input = launchpadmk2::input(message);
+
+		switch (input.message_type())
 		{
-            // grid button pressed or released.
-            if (message[0] == 0x90) {
-                // we want to only handle inside grid buttons, not the "page" side buttons.
-                if (message[1] % 0x10 <= 0x07) {
-                    button = get_button(message[1]);
+        case message_type::grid_pressed:
+	        {
+	            this->sendMessage(commands::led_setPalette(input.keycode(), 5));
+	            break;
+	        }
+        case message_type::grid_depressed:
+	        {
+	            button = get_button(input.keycode());
 
-                    // pressed
-                    if (message[2] == 0x7F) {
-                        this->sendMessage(commands::led_set(message[1],
-                            5));
-                    }
-                    // released.
-                    else if (message[2] == 0x00) {
-                        if (button == nullptr) {
-                            this->sendMessage(commands::led_off(message[1]));
-                        }
-                        else {
-                            button->execute();
+        		if (button == nullptr)
+        		{
+	                this->sendMessage(commands::led_off(input.keycode()));
+        		}
+        		else
+        		{
+	                button->execute();
+	                this->sendMessage(commands::led_set(input.keycode(), button->get_color()));
+        		}
+	            break;
+	        }
+        case message_type::grid_page_change_pressed:
+	        {
+				// change page.
+	            page = message[1] / 0x10;
 
-                            this->sendMessage(commands::led_set(message[1],
-                                button->get_color()));
-                        }
-                    }
-                }
-                else {
-                    // pressed
-                    if (message[2] == 0x7F) {
-                        // change page.
-                        page = message[1] / 0x10;
-
-                        // update all buttons
-                        this->fullLedUpdate();
-                    }
-                    // released.
-                    else if (message[2] == 0x00) {
-                    }
-                }
-
-            }
-            // Automap/Live buttons pressed or released.
-            /* else if (message[0] == 0xB0) {
-                // pressed
-                if (message[2] == 0x7F) {
-                    if (message[1] >= 108)
-                        mode = static_cast<launchpad::mode>(message[1]);
-
-                    this->fullLedUpdate();
-                }
-                // released.
-                else if (message[2] == 0x00) {
-
-                }
-            } */
+        		// update all buttons
+                this->fullLedUpdate();
+	        }
+        case message_type::automap_live_depressed:
+			{
+				break;
+			}
 		}
+		
         button = nullptr;
         message.clear();
 	}
@@ -188,7 +199,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::sendMessage(unsigned char* message
     }
 
     try {
-        out->sendMessage(message, sizeof(unsigned char) * 3);
+        out->sendMessage(message, sizeof(unsigned char) * 5);
     }
     catch (RtMidiError& error) {
         error.printMessage();
@@ -236,9 +247,218 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
                     continue;
                 }
 
-                this->sendMessage(launchpad::commands::led_on(commands::calculate_grid(row, col), button->get_color()));
+                this->sendMessage(
+                    commands::led_set(commands::calculate_grid(row, col),
+                        button->get_color())
+                );
             }
 
         }
     }
+}
+
+void midi_device::launchpadmk2::LaunchpadMk2::setup_pages_test()
+{
+    launchpad_grid* page = new launchpad_grid{ nullptr };
+
+    config::ButtonBase* button = new config::ButtonSimpleKeycodeTest(0x41);
+
+    button->set_color(0xFFFF00);
+
+    page->at(7)[7] = button;
+
+    button = new config::ButtonComplexMacro([]() { _DebugString("lol\n"); });
+
+    button->set_color(0xFFAA00);
+	page->at(7)[6] = button;
+
+
+https://onlineunicodetools.com/convert-unicode-to-hex use UCS-2-BE
+    wchar_t* ste = new wchar_t[] {
+        0xd14c, // (korean) te
+            0xc2a4, // s
+            0xd2b8, // t
+            0x0021, // !
+            0x0 // null terminator
+    };
+    std::wstring test = std::wstring(ste);
+    button = new config::ButtonStringMacro(test);
+    button->set_color(0xAAAA00);
+    page->at(7)[5] = button;
+
+    // mute
+    button = new config::ButtonSimpleKeycodeTest(VK_F13);
+    button->set_color(0xFFFF00);
+    page->at(7)[0] = button;
+
+    // deafen
+    button = new config::ButtonSimpleKeycodeTest(VK_F14);
+    button->set_color(0xAA0000);
+    page->at(7)[1] = button;
+
+    button = new config::ButtonSimpleKeycodeTest('a');
+    button->set_color(0xFFFF00);
+    page->at(6)[4] = button;
+
+    pages.push_back(page);
+}
+
+void midi_device::launchpadmk2::LaunchpadMk2::load_config_buttons_test() {
+    try {
+        /*if (::config::config_file.at("devices").contains("Launchpad_S")) {
+            return;
+        }*/
+
+        // why
+        if (!::config::config_file.at("devices").at("Launchpad_MK2").is_object()) {
+            return;
+        }
+
+        nlohmann::json& config = ::config::config_file.at("devices").at("Launchpad_MK2");
+        pages.clear();
+        // FIXME: hard limit of 8 pages by buttons but this should be handled better.
+        pages.resize(8);
+
+        for (auto& [page, buttons] : config.at("session").items()) {
+            int index = std::stoi(page);
+            launchpad_grid* page_buttons = new launchpad_grid{ nullptr };
+
+            if (!buttons.is_array()) {
+                _DebugString("lol you're fucked\n");
+            }
+
+            for (auto& button : buttons) {
+                std::string type = button.at("type");
+                int position_x = button.at("position").at(0);
+                int position_y = button.at("position").at(1);
+                unsigned int color = 0x221100;
+
+                config::ButtonBase* new_button;
+
+                if (type == "key_test") {
+                    if (!button.at("data").is_number()) {
+                        continue;
+                    }
+
+                    new_button = new config::ButtonSimpleKeycodeTest(button.at("data"));
+
+                }
+                else if (type == "key_string") {
+                    if (!button.at("data").is_string()) {
+                        continue;
+                    }
+
+                    new_button = new config::ButtonStringMacro(string_to_wstring(button.at("data")));
+                }
+                else {
+                    new_button = new config::ButtonSimpleKeycodeTest('b');
+                }
+
+                new_button->set_color(color);
+
+                page_buttons->at(position_x).at(position_y) = new_button;
+            }
+
+            pages.at(index) = page_buttons;
+        }
+    }
+    catch (std::invalid_argument& e) {
+        _DebugString("invalid args!\n");
+    }
+    catch (nlohmann::json::type_error& e) {
+        _DebugString("type error!\n");
+    }
+    catch (nlohmann::json::out_of_range& e) {
+        _DebugString("range error!\n");
+    }
+
+}
+
+void midi_device::launchpadmk2::LaunchpadMk2::TerminateDevice()
+{
+    execute_all = false;
+}
+
+void midi_device::launchpadmk2::config::ButtonSimpleKeycodeTest::execute()
+{
+    if (keycode == -1) {
+        return;
+    }
+
+    INPUT input;
+
+    input.type = INPUT_KEYBOARD;
+    input.ki.time = 0;
+    input.ki.wScan = NULL;
+    input.ki.dwExtraInfo = NULL;
+
+    input.ki.wVk = keycode;
+    input.ki.dwFlags = 0;
+
+    // send
+    SendInput(1, &input, sizeof(INPUT));
+
+    // wait
+    Sleep(100);
+
+    // release
+    input.ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(1, &input, sizeof(INPUT));
+
+}
+
+void midi_device::launchpadmk2::config::ButtonComplexMacro::execute()
+{
+    this->func();
+}
+
+void midi_device::launchpadmk2::config::ButtonStringMacro::execute()
+{
+    for (const wchar_t a : string) {
+        INPUT input;
+
+        input.type = INPUT_KEYBOARD;
+        input.ki.time = 0;
+        input.ki.wScan = a;
+        input.ki.dwExtraInfo = NULL;
+
+        input.ki.wVk = NULL;
+        input.ki.dwFlags = KEYEVENTF_UNICODE;
+
+        // send
+        SendInput(1, &input, sizeof(INPUT));
+
+        // wait
+        Sleep(1);
+
+        // release
+        input.ki.dwFlags = KEYEVENTF_KEYUP;
+        SendInput(1, &input, sizeof(INPUT));
+
+        Sleep(1);
+    }
+}
+
+std::wstring midi_device::launchpadmk2::config::ButtonStringMacro::to_wstring()
+{
+    return L"midi_device::launchpadmk2::config::ButtonStringMacro : color=" + std::to_wstring(this->get_color()) + L" str=\"" + this->string + L"\"";
+}
+
+
+std::wstring midi_device::launchpadmk2::config::ButtonBase::to_wstring()
+{
+    return L"midi_device::launchpadmk2::config::ButtonBase : empty button";
+}
+
+std::wstring midi_device::launchpadmk2::config::ButtonComplexMacro::to_wstring()
+{
+    std::wstringstream buffer;
+    buffer << std::hex << &this->func;
+
+    return L"midi_device::launchpadmk2::config::ButtonComplexMacro : color=" + std::to_wstring(this->get_color()) + L" func_ptr=" + buffer.str();
+}
+
+std::wstring midi_device::launchpadmk2::config::ButtonSimpleKeycodeTest::to_wstring()
+{
+    return L"midi_device::launchpadmk2::config::ButtonSimpleKeycodeTest : color=" + std::to_wstring(this->get_color()) + L" keycode=" + std::to_wstring(this->keycode);
 }
