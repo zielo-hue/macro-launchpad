@@ -8,5 +8,5 @@ namespace midi_device {
 		RtMidiOut* out;
 	};
 
-
+	extern std::vector<MidiDeviceBase*> devices;
 }
