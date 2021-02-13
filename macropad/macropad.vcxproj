@@ -159,6 +159,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="json.hpp" />
     <ClInclude Include="Launchpad.h" />
+    <ClInclude Include="LaunchpadMk2.h" />
     <ClInclude Include="macropad.h">
       <FileType>CppHeader</FileType>
     </ClInclude>
@@ -171,6 +172,7 @@
   <ItemGroup>
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Launchpad.cpp" />
+    <ClCompile Include="LaunchpadMk2.cpp" />
     <ClCompile Include="macropad.cpp" />
     <ClCompile Include="MidiDevice.cpp" />
     <ClCompile Include="pch.cpp" />

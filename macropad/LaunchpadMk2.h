@@ -117,5 +117,29 @@ namespace midi_device::launchpadmk2
 			x = keycode / 0x0A;
 			y = keycode % 0x0A;
 		}
+
+		// use color palette
+		inline unsigned char* led_setPalette(unsigned char key, unsigned char color)
+		{
+			return new unsigned char[3]{ 0x90, key, color };
+		}
+
+		// RGB Values
+		inline unsigned char* led_set(unsigned char key, unsigned int color) {
+			return new unsigned char[5]
+			{
+				0x90, key,
+				(unsigned char) (color & 0xFF0000) >> 4,
+				(unsigned char) (color & 0x00FF00) >> 2,
+				(unsigned char) (color & 0x0000FF),
+			};
+		}
+
+		inline unsigned char* led_off(unsigned char key)
+		{
+			return new unsigned char[3]{ 0x80, key };
+		}
+
+		constexpr unsigned char reset[3] = { 0xB0, 0x00, 0x00 };
 	}
 }
