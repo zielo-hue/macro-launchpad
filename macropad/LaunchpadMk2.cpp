@@ -63,6 +63,8 @@ void midi_device::launchpadmk2::LaunchpadMk2::Init()
 
     this->setup_pages_test();
     this->fullLedUpdate();
+
+    devices.push_back(this);
 }
 
 void midi_device::launchpadmk2::LaunchpadMk2::reset()
@@ -79,7 +81,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::RunDevice()
 }
 
 midi_device::launchpadmk2::message_type midi_device::launchpadmk2::input::message_type() {
-    midi_device::launchpadmk2::message_type type =
+    launchpadmk2::message_type type =
         static_cast<midi_device::launchpadmk2::message_type>(message.at(0) + message.at(2));
 
     // this shouldn't happen...
@@ -218,7 +220,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
         return;
 
     // reset everything first.
-    out->sendMessage(commands::reset, sizeof(unsigned char) * 3);
+    out->sendMessage(commands::reset, sizeof(unsigned char) * 5);
 
     // set our page indicator to color 12, yellow
 	// REFER TO THE MK2 PROGRAMMER'S MANUAL!!!! i should probably do this programatically
@@ -227,11 +229,11 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
         12));
 
     // set our "mode" indicator
-    this->sendMessage(new unsigned char[3]{ 0xB0, (unsigned char)mode,
+    this->sendMessage(new unsigned char[5]{ 0xB0, static_cast<unsigned char>(mode),
         12 });
 
     // update every LEDs.
-    if ((size_t)page < pages.size()) {
+    if (static_cast<size_t>(page) < pages.size()) {
 
         // row
         for (size_t row = 0; row < pages.at(page)->size(); ++row) {
@@ -265,7 +267,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::setup_pages_test()
 
     button->set_color(0xFFFF00);
 
-    page->at(7)[7] = button;
+    page->at(0)[0] = button;
 
     button = new config::ButtonComplexMacro([]() { _DebugString("lol\n"); });
 

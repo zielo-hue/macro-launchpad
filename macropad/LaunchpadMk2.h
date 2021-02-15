@@ -145,21 +145,21 @@ namespace midi_device::launchpadmk2
 
 		inline void calculate_xy_from_keycode(unsigned char keycode, int &x, int &y)
 		{
-			x = keycode / 0x0A;
-			y = keycode % 0x0A;
+			x = keycode / 0x0A - 1;
+			y = keycode % 0x0A - 1;
 		}
 
 		// use color palette
 		inline unsigned char* led_setPalette(unsigned char key, unsigned char color)
 		{
-			return new unsigned char[3]{ 0x90, key, color };
+			return new unsigned char[5]{ 0x0A, key, color};
 		}
 
 		// RGB Values
 		inline unsigned char* led_set(unsigned char key, unsigned int color) {
 			return new unsigned char[5]
 			{
-				0x90, key,
+				0x0B, key,
 				static_cast<unsigned char>((color & 0xFF0000) >> 4),
 				static_cast<unsigned char>((color & 0x00FF00) >> 2),
 				static_cast<unsigned char>(color & 0x0000FF),
@@ -171,6 +171,12 @@ namespace midi_device::launchpadmk2
 			return led_setPalette(key, 0);
 		}
 
-		constexpr unsigned char reset[3] = { 0xB0, 0x00, 0x00 };
+		// Use palette color values
+		inline unsigned char* led_setAll(unsigned char color)
+		{
+			return new unsigned char[5]{ 0x0E, color };
+		}
+
+		constexpr unsigned char reset[5] = { 0xB0, 0x00, 0x00, 0x00, 0x00 };
 	}
 }
