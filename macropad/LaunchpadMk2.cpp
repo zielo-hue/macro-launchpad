@@ -137,7 +137,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 		{
         case message_type::grid_pressed:
 	        {
-	            this->sendMessage(commands::led_setPalette(input.keycode(), 5));
+	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 5));
 	            break;
 	        }
         case message_type::grid_depressed:
@@ -146,7 +146,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 
         		if (button == nullptr)
         		{
-	                this->sendMessage(commands::led_off(input.keycode()));
+	                this->sendMessageSysex(commands::led_off(input.keycode()));
         		}
         		else
         		{
@@ -207,6 +207,36 @@ void midi_device::launchpadmk2::LaunchpadMk2::sendMessage(unsigned char* message
         error.printMessage();
         _DebugString(error.getMessage());
     }
+
+cleanup:
+    delete[] message;
+}
+
+// sysex test
+void midi_device::launchpadmk2::LaunchpadMk2::sendMessageSysex(unsigned char* message)
+{
+    unsigned char header[]{ 0xF0, 0x00, 0x20, 0x29, 0x02, 0x18 };
+
+	// custom message payload
+    std::vector<unsigned char> messageOut(message, message + sizeof(message) / sizeof(message[0]));
+
+    if (!out->isPortOpen())
+        goto cleanup;
+	
+	// add header to start
+	messageOut.insert(messageOut.begin(), std::begin(header), std::end(header));
+	// add header to end
+    messageOut.push_back(static_cast<unsigned char>(0xF7));
+	
+	try
+	{
+        out->sendMessage(messageOut.data(), messageOut.size());
+	}
+	catch (RtMidiError& error)
+	{
+        error.printMessage();
+        _DebugString(error.getMessage());
+	}
 
 cleanup:
     delete[] message;

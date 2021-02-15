@@ -86,6 +86,7 @@ namespace midi_device::launchpadmk2
 
 		void Init();
 		void sendMessage(unsigned char* message);
+		void sendMessageSysex(unsigned char* message);
 		void fullLedUpdate();
 		void setup_pages_test();
 
@@ -152,7 +153,7 @@ namespace midi_device::launchpadmk2
 		// use color palette
 		inline unsigned char* led_setPalette(unsigned char key, unsigned char color)
 		{
-			return new unsigned char[5]{ 0x0A, key, color};
+			return new unsigned char[3]{ 0x0A, key, color};
 		}
 
 		// RGB Values
