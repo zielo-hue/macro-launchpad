@@ -82,14 +82,14 @@ void midi_device::launchpadmk2::LaunchpadMk2::RunDevice()
 
 midi_device::launchpadmk2::message_type midi_device::launchpadmk2::input::message_type() {
     launchpadmk2::message_type type =
-        static_cast<midi_device::launchpadmk2::message_type>(message.at(0) + message.at(2));
+        static_cast<launchpadmk2::message_type>(message.at(0) + message.at(2));
 
     // this shouldn't happen...
     if (type > message_type::automap_live_pressed || type < message_type::grid_depressed) {
         return message_type::invalid;
     }
 
-    if (message.at(1) % 0x10 == 0x08) {
+    if (message.at(1) % 0x0A == 0x09) {
         if (type == message_type::grid_depressed) {
             return message_type::grid_page_change_depressed;
         }
@@ -98,7 +98,7 @@ midi_device::launchpadmk2::message_type midi_device::launchpadmk2::input::messag
         }
     }
 
-    return static_cast<midi_device::launchpadmk2::message_type>(message.at(0) + message.at(2));
+    return static_cast<launchpadmk2::message_type>(message.at(0) + message.at(2));
 }
 
 unsigned char midi_device::launchpadmk2::input::keycode() {
@@ -137,7 +137,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 		{
         case message_type::grid_pressed:
 	        {
-	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 5));
+	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 49));
 	            break;
 	        }
         case message_type::grid_depressed:
@@ -151,14 +151,14 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
         		else
         		{
 	                button->execute();
-	                this->sendMessage(commands::led_set(input.keycode(), button->get_color()));
+	                this->sendMessageSysex(commands::led_set(input.keycode(), button->get_color()));
         		}
 	            break;
 	        }
         case message_type::grid_page_change_pressed:
 	        {
 				// change page.
-	            page = message[1] / 0x10;
+	            page = message[1] / 0x0B - 1;
 
         		// update all buttons
                 this->fullLedUpdate();
@@ -254,12 +254,12 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
 
     // set our page indicator to color 12, yellow
 	// REFER TO THE MK2 PROGRAMMER'S MANUAL!!!! i should probably do this programatically
-    this->sendMessage(commands::led_setPalette(
+    this->sendMessageSysex(commands::led_setPalette(
         0x10 * page + 0x08,
         12));
 
     // set our "mode" indicator
-    this->sendMessage(new unsigned char[5]{ 0xB0, static_cast<unsigned char>(mode),
+    this->sendMessageSysex(new unsigned char[5]{ 0xB0, static_cast<unsigned char>(mode),
         12 });
 
     // update every LEDs.
@@ -279,7 +279,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
                     continue;
                 }
 
-                this->sendMessage(
+                this->sendMessageSysex(
                     commands::led_set(commands::calculate_grid(row, col),
                         button->get_color())
                 );
