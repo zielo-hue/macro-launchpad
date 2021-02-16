@@ -247,6 +247,19 @@ cleanup:
     delete[] message;
 }
 
+// clear the grid
+void midi_device::launchpadmk2::LaunchpadMk2::clearGrid()
+{
+	for (size_t row = 0; row < 8; ++row)
+	{
+		for (size_t column = 0; column < 8; ++column)
+		{
+            this->sendMessageSysex(commands::led_off(commands::calculate_grid(row, column)), 3);
+		}
+	}
+}
+
+
 // this will literally update EVERYTHING. do NOT call this function unless you ABSOLUTELY NEED TO!
 void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
 {
@@ -268,7 +281,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
     	//{
      //       this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 14), 3);
     	//}
-        this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 14), 3);
+        this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 15), 3);
     }
 
     // set our page indicator to color 12, yellow
@@ -283,10 +296,10 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
 
     // clear grid
     // this->sendMessageSysex(commands::led_setAll(0x00));
+    this->clearGrid();
 	
     // update every LEDs.
     if (static_cast<size_t>(page) < pages.size()) {
-
         // row
         for (size_t row = 0; row < pages.at(page)->size(); ++row) {
             // column

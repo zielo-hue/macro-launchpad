@@ -87,6 +87,7 @@ namespace midi_device::launchpadmk2
 		void Init();
 		void sendMessage(unsigned char* message);
 		void sendMessageSysex(unsigned char* message, size_t size);
+		void clearGrid();
 		void fullLedUpdate();
 		void setup_pages_test();
 
@@ -172,8 +173,6 @@ namespace midi_device::launchpadmk2
 				static_cast<unsigned char>(color & 0x0000FF),
 			};
 		}
-
-		
 
 		inline unsigned char* led_off(unsigned char key)
 		{
