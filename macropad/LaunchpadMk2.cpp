@@ -137,7 +137,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 		{
         case message_type::grid_pressed:
 	        {
-	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 49), commands::led_setPalette_size);
+	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 49));
 	            break;
 	        }
         case message_type::grid_depressed:
@@ -146,12 +146,12 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 
         		if (button == nullptr)
         		{
-	                this->sendMessageSysex(commands::led_off(input.keycode()), commands::led_setPalette_size);
+	                this->sendMessageSysex(commands::led_off(input.keycode()));
         		}
         		else
         		{
 	                button->execute();
-	                this->sendMessageSysex(commands::led_set(input.keycode(), button->get_color()), commands::led_set_size);
+	                this->sendMessageSysex(commands::led_set(input.keycode(), button->get_color()));
         		}
 	            break;
 	        }
@@ -194,7 +194,7 @@ midi_device::launchpadmk2::config::ButtonBase* midi_device::launchpadmk2::Launch
 }
 
 // custom calculated messages go here
-void midi_device::launchpadmk2::LaunchpadMk2::sendMessage(unsigned char* message)
+void midi_device::launchpadmk2::LaunchpadMk2::sendMessage(unsigned char* message) 
 {
     if (!out->isPortOpen()) {
         goto cleanup;
@@ -211,40 +211,77 @@ void midi_device::launchpadmk2::LaunchpadMk2::sendMessage(unsigned char* message
 cleanup:
     delete[] message;
 }
+void midi_device::launchpadmk2::LaunchpadMk2::sendMessage(std::vector<unsigned char> messageOut) 
+{
+    if (!out->isPortOpen()) {
+        return;
+    }
 
-// sysex test
+    try {
+        out->sendMessage(messageOut.data(), messageOut.size());
+    }
+    catch (RtMidiError& error) {
+        error.printMessage();
+        _DebugString(error.getMessage());
+    }
+}
+
+// sysex messages go here
 void midi_device::launchpadmk2::LaunchpadMk2::sendMessageSysex(unsigned char* message, size_t size)
 {
     unsigned char header[]{ 0xF0, 0x00, 0x20, 0x29, 0x02, 0x18 };
 
-	// custom message payload
+    // custom message payload
     std::vector<unsigned char> messageOut;
 
     if (!out->isPortOpen())
         goto cleanup;
-	
-	// add header to start
-	messageOut.insert(messageOut.begin(), std::begin(header), std::end(header));
 
-    for(size_t i = 0; i < size; ++i) {
+    // add header to start
+    messageOut.insert(messageOut.begin(), std::begin(header), std::end(header));
+
+    for (size_t i = 0; i < size; ++i) {
         messageOut.push_back(message[i]);
     }
 
-	// add header to end
+    // add header to end
     messageOut.push_back(static_cast<unsigned char>(0xF7));
-	
-	try
-	{
+
+    try
+    {
         out->sendMessage(messageOut.data(), messageOut.size());
-	}
-	catch (RtMidiError& error)
-	{
+    }
+    catch (RtMidiError& error)
+    {
         error.printMessage();
         _DebugString(error.getMessage());
-	}
+    }
 
 cleanup:
     delete[] message;
+}
+void midi_device::launchpadmk2::LaunchpadMk2::sendMessageSysex(std::vector<unsigned char> messageOut)
+{
+    unsigned char header[]{ 0xF0, 0x00, 0x20, 0x29, 0x02, 0x18 };
+
+    if (!out->isPortOpen())
+        return;
+
+    // add header to start
+    messageOut.insert(messageOut.begin(), std::begin(header), std::end(header));
+
+    // add header to end
+    messageOut.push_back(static_cast<unsigned char>(0xF7));
+
+    try
+    {
+        out->sendMessage(messageOut.data(), messageOut.size());
+    }
+    catch (RtMidiError& error)
+    {
+        error.printMessage();
+        _DebugString(error.getMessage());
+    }
 }
 
 // clear the grid
@@ -254,7 +291,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::clearGrid()
 	{
 		for (size_t column = 0; column < 8; ++column)
 		{
-            this->sendMessageSysex(commands::led_off(commands::calculate_grid(row, column)), 3);
+            this->sendMessageSysex(commands::led_off(commands::calculate_grid(row, column)));
 		}
 	}
 }
@@ -273,22 +310,14 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
     // clear page indicators
     for (size_t row = 0; row < 8; ++row)
     {
-    	//try
-    	//{
-     //       pages.at(page);
-    	//}
-    	//catch (const std::out_of_range& e)
-    	//{
-     //       this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 14), 3);
-    	//}
-        this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 15), 3);
+        this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 15));
     }
 
     // set our page indicator to color 12, yellow
 	// REFER TO THE MK2 PROGRAMMER'S MANUAL!!!! i should probably do this programatically
     this->sendMessageSysex(commands::led_setPalette(
         0x0A * page + 0x0A + 0x09,
-        12), commands::led_setPalette_size);
+        12));
 	
 
     // set our "mode" indicator
@@ -311,13 +340,13 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
                 config::ButtonBase* button = pages.at(page)->at(row).at(col);
 
                 if (button == nullptr) {
-                    this->sendMessageSysex(commands::led_off(commands::calculate_grid(row, col)), 3);
+                    this->sendMessageSysex(commands::led_off(commands::calculate_grid(row, col)));
                     continue;
                 }
                 // _DebugString(commands::led_set(commands::calculate_grid(row, col));
                 this->sendMessageSysex(
                     commands::led_set(commands::calculate_grid(row, col),
-                        button->get_color()), commands::led_set_size
+                        button->get_color())
                 );
             }
 

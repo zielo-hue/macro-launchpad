@@ -86,7 +86,9 @@ namespace midi_device::launchpadmk2
 
 		void Init();
 		void sendMessage(unsigned char* message);
+		void sendMessage(std::vector<unsigned char> messageOut);
 		void sendMessageSysex(unsigned char* message, size_t size);
+		void sendMessageSysex(std::vector<unsigned char> messageOut);
 		void clearGrid();
 		void fullLedUpdate();
 		void setup_pages_test();
@@ -151,30 +153,26 @@ namespace midi_device::launchpadmk2
 			y = keycode % 0x0A - 1;
 		}
 
-		// think of a better way to do this, maybe use vectors from the start, idk.
-		// hell, using std::array would work better than this shit.
-		constexpr size_t led_setPalette_size = 3;
 		// use color palette
-		inline unsigned char* led_setPalette(unsigned char key, unsigned char color)
+		inline std::vector<unsigned char> led_setPalette(const unsigned char key, const unsigned char color)
 		{
-			return new unsigned char[3]{ 0x0A, key, color};
+			std::vector<unsigned char> message({ 0x0A, key, color });
+			return message;
+		}
+		
+		inline std::vector<unsigned char> led_set(const unsigned char key, const unsigned int color)
+		{
+			std::vector<unsigned char> message(
+				{ 0x0B, key,
+					static_cast<unsigned char>((color & 0xFF0000) >> 16),
+					static_cast<unsigned char>((color & 0x00FF00) >> 8),
+					static_cast<unsigned char>(color & 0x0000FF),
+				});
+			return message;
 		}
 
-		// inline std::vector<unsigned char>* led_setPalette
-
-		constexpr size_t led_set_size = 5;
-		// RGB Values
-		inline unsigned char* led_set(unsigned char key, unsigned int color) {
-			return new unsigned char[5]
-			{
-				0x0B, key,
-				static_cast<unsigned char>((color & 0xFF0000) >> 16),
-				static_cast<unsigned char>((color & 0x00FF00) >> 8),
-				static_cast<unsigned char>(color & 0x0000FF),
-			};
-		}
-
-		inline unsigned char* led_off(unsigned char key)
+		// turn off LED
+		inline std::vector<unsigned char> led_off(const unsigned char key)
 		{
 			return led_setPalette(key, 0);
 		}
@@ -184,6 +182,12 @@ namespace midi_device::launchpadmk2
 		inline unsigned char* led_setAll(unsigned char color)
 		{
 			return new unsigned char[2]{ 0x0E, color };
+		}
+
+		inline std::vector<unsigned char> led_setColumn(unsigned char column, unsigned char color)
+		{
+			std::vector<unsigned char> message({ 0x0C, column, color });
+			return message;
 		}
 
 		constexpr unsigned char reset[5] = { 0xB0, 0x00, 0x00, 0x00, 0x00 };
