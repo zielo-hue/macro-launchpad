@@ -86,7 +86,7 @@ namespace midi_device::launchpadmk2
 
 		void Init();
 		void sendMessage(unsigned char* message);
-		void sendMessageSysex(unsigned char* message);
+		void sendMessageSysex(unsigned char* message, size_t size);
 		void fullLedUpdate();
 		void setup_pages_test();
 
@@ -141,7 +141,7 @@ namespace midi_device::launchpadmk2
 		// REMEMBER bottom left starts with 0x0B!! not 0x00
 		inline unsigned char calculate_grid(unsigned char row, unsigned char column)
 		{
-			return (0x0A * row) + column;
+			return (0x0A * row) + column + 0x0B;
 		}
 
 		inline void calculate_xy_from_keycode(unsigned char keycode, int &x, int &y)
@@ -150,32 +150,41 @@ namespace midi_device::launchpadmk2
 			y = keycode % 0x0A - 1;
 		}
 
+		// think of a better way to do this, maybe use vectors from the start, idk.
+		// hell, using std::array would work better than this shit.
+		constexpr size_t led_setPalette_size = 3;
 		// use color palette
 		inline unsigned char* led_setPalette(unsigned char key, unsigned char color)
 		{
 			return new unsigned char[3]{ 0x0A, key, color};
 		}
 
+		// inline std::vector<unsigned char>* led_setPalette
+
+		constexpr size_t led_set_size = 5;
 		// RGB Values
 		inline unsigned char* led_set(unsigned char key, unsigned int color) {
 			return new unsigned char[5]
 			{
 				0x0B, key,
-				static_cast<unsigned char>((color & 0xFF0000) >> 4),
-				static_cast<unsigned char>((color & 0x00FF00) >> 2),
+				static_cast<unsigned char>((color & 0xFF0000) >> 16),
+				static_cast<unsigned char>((color & 0x00FF00) >> 8),
 				static_cast<unsigned char>(color & 0x0000FF),
 			};
 		}
+
+		
 
 		inline unsigned char* led_off(unsigned char key)
 		{
 			return led_setPalette(key, 0);
 		}
 
+		constexpr size_t led_setAll_size = 2;
 		// Use palette color values
 		inline unsigned char* led_setAll(unsigned char color)
 		{
-			return new unsigned char[5]{ 0x0E, color };
+			return new unsigned char[2]{ 0x0E, color };
 		}
 
 		constexpr unsigned char reset[5] = { 0xB0, 0x00, 0x00, 0x00, 0x00 };

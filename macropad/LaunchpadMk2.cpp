@@ -137,7 +137,7 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 		{
         case message_type::grid_pressed:
 	        {
-	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 49));
+	            this->sendMessageSysex(commands::led_setPalette(input.keycode(), 49), commands::led_setPalette_size);
 	            break;
 	        }
         case message_type::grid_depressed:
@@ -146,12 +146,12 @@ void midi_device::launchpadmk2::LaunchpadMk2::Loop()
 
         		if (button == nullptr)
         		{
-	                this->sendMessageSysex(commands::led_off(input.keycode()));
+	                this->sendMessageSysex(commands::led_off(input.keycode()), commands::led_setPalette_size);
         		}
         		else
         		{
 	                button->execute();
-	                this->sendMessageSysex(commands::led_set(input.keycode(), button->get_color()));
+	                this->sendMessageSysex(commands::led_set(input.keycode(), button->get_color()), commands::led_set_size);
         		}
 	            break;
 	        }
@@ -213,18 +213,23 @@ cleanup:
 }
 
 // sysex test
-void midi_device::launchpadmk2::LaunchpadMk2::sendMessageSysex(unsigned char* message)
+void midi_device::launchpadmk2::LaunchpadMk2::sendMessageSysex(unsigned char* message, size_t size)
 {
     unsigned char header[]{ 0xF0, 0x00, 0x20, 0x29, 0x02, 0x18 };
 
 	// custom message payload
-    std::vector<unsigned char> messageOut(message, message + sizeof(message) / sizeof(message[0]));
+    std::vector<unsigned char> messageOut;
 
     if (!out->isPortOpen())
         goto cleanup;
 	
 	// add header to start
 	messageOut.insert(messageOut.begin(), std::begin(header), std::end(header));
+
+    for(size_t i = 0; i < size; ++i) {
+        messageOut.push_back(message[i]);
+    }
+
 	// add header to end
     messageOut.push_back(static_cast<unsigned char>(0xF7));
 	
@@ -252,16 +257,33 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
     // reset everything first.
     out->sendMessage(commands::reset, sizeof(unsigned char) * 5);
 
+    // clear page indicators
+    for (size_t row = 0; row < 8; ++row)
+    {
+    	//try
+    	//{
+     //       pages.at(page);
+    	//}
+    	//catch (const std::out_of_range& e)
+    	//{
+     //       this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 14), 3);
+    	//}
+        this->sendMessageSysex(commands::led_setPalette(commands::calculate_grid(row, 8), 14), 3);
+    }
+
     // set our page indicator to color 12, yellow
 	// REFER TO THE MK2 PROGRAMMER'S MANUAL!!!! i should probably do this programatically
     this->sendMessageSysex(commands::led_setPalette(
-        0x10 * page + 0x08,
-        12));
+        0x0A * page + 0x0A + 0x09,
+        12), commands::led_setPalette_size);
+	
 
     // set our "mode" indicator
-    this->sendMessageSysex(new unsigned char[5]{ 0xB0, static_cast<unsigned char>(mode),
-        12 });
+    this->sendMessageSysex(new unsigned char[3]{ 0xB0, static_cast<unsigned char>(mode), 12 }, 3);
 
+    // clear grid
+    // this->sendMessageSysex(commands::led_setAll(0x00));
+	
     // update every LEDs.
     if (static_cast<size_t>(page) < pages.size()) {
 
@@ -276,12 +298,13 @@ void midi_device::launchpadmk2::LaunchpadMk2::fullLedUpdate()
                 config::ButtonBase* button = pages.at(page)->at(row).at(col);
 
                 if (button == nullptr) {
+                    this->sendMessageSysex(commands::led_off(commands::calculate_grid(row, col)), 3);
                     continue;
                 }
-
+                // _DebugString(commands::led_set(commands::calculate_grid(row, col));
                 this->sendMessageSysex(
                     commands::led_set(commands::calculate_grid(row, col),
-                        button->get_color())
+                        button->get_color()), commands::led_set_size
                 );
             }
 
@@ -294,14 +317,11 @@ void midi_device::launchpadmk2::LaunchpadMk2::setup_pages_test()
     launchpad_grid* page = new launchpad_grid{ nullptr };
 
     config::ButtonBase* button = new config::ButtonSimpleKeycodeTest(0x41);
-
-    button->set_color(0xFFFF00);
-
+    button->set_color(0x3F3F00);
     page->at(0)[0] = button;
 
     button = new config::ButtonComplexMacro([]() { _DebugString("lol\n"); });
-
-    button->set_color(0xFFAA00);
+    button->set_color(0x3F3A00);
 	page->at(7)[6] = button;
 
 
@@ -315,21 +335,21 @@ https://onlineunicodetools.com/convert-unicode-to-hex use UCS-2-BE
     };
     std::wstring test = std::wstring(ste);
     button = new config::ButtonStringMacro(test);
-    button->set_color(0xAAAA00);
+    button->set_color(0x3A3A00);
     page->at(7)[5] = button;
 
     // mute
     button = new config::ButtonSimpleKeycodeTest(VK_F13);
-    button->set_color(0xFFFF00);
+    button->set_color(0x3F3F00);
     page->at(7)[0] = button;
 
     // deafen
     button = new config::ButtonSimpleKeycodeTest(VK_F14);
-    button->set_color(0xAA0000);
+    button->set_color(0x3A0000);
     page->at(7)[1] = button;
 
     button = new config::ButtonSimpleKeycodeTest('a');
-    button->set_color(0xFFFF00);
+    button->set_color(0x3F3F00);
     page->at(6)[4] = button;
 
     pages.push_back(page);
